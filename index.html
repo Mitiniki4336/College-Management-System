@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>College Health and Information System</title>
+<style>
+body { font-family: Arial, sans-serif; margin:0; padding:0; overflow-x:hidden; background:#f5f5f5; color:#333; transition: background 0.3s, color 0.3s;}
+#waveBackground { position: fixed; top:0; left:0; width:200%; height:200%; background: linear-gradient(135deg, #cfd9df, #e2ebf0); z-index:-1; animation: wave 10s linear infinite;}
+@keyframes wave { 0% {transform:translateX(0) translateY(0);} 50%{transform:translateX(-25%) translateY(20px);} 100%{transform:translateX(0) translateY(0);} }
+body.dark { background:#121212; color:#eee; }
+body.dark #waveBackground { background: linear-gradient(135deg, #2c2c2c, #3d3d3d); }
+#loginScreen { display:flex; justify-content:center; align-items:center; height:100vh; gap:30px; flex-wrap:wrap; }
+.form-container { background: rgba(255,255,255,0.95); padding:30px; border-radius:15px; box-shadow:0 6px 12px rgba(0,0,0,0.2); text-align:center; min-width:300px; position:relative;}
+body.dark .form-container { background:#1e1e1e; box-shadow:0 6px 12px rgba(255,255,255,0.1); }
+h2 { margin-bottom:20px; color:#4a148c;}
+body.dark h2 { color:#c39bd3; }
+input, select, button { margin:10px 0; padding:10px; width:250px; border-radius:8px; border:1px solid #ccc; font-size:16px; }
+body.dark input, body.dark select { border:1px solid #555; background:#2c2c2c; color:#eee; }
+button { background:#4a148c; color:white; cursor:pointer; border:none; transition: background 0.3s; }
+button:hover { background:#6a1b9a; }
+#togglePw { position:absolute; right:20px; top:110px; background:transparent; border:none; cursor:pointer; font-size:18px; }
+#mainApp { display:none; opacity:1; transition: opacity 0.5s ease, transform 0.5s ease; }
+#mainApp.logout { opacity:0; transform:translateY(-20px); }
+header { background:#4a148c; color:white; padding:20px; text-align:center; font-size:24px; font-weight:bold; display:flex; justify-content:space-between; align-items:center; }
+header button { background:#fff; color:#4a148c; border:none; padding:8px 15px; border-radius:8px; cursor:pointer; margin-left:10px; }
+header button:hover { background:#eee; }
+body.dark header button { background:#333; color:#fff; }
+body.dark header { background:#2c2c2c; color:#fff; }
+nav { background:#6a1b9a; padding:10px 20px; }
+nav a { color:white; text-decoration:none; margin-right:20px; font-weight:bold; }
+nav a:hover { text-decoration:underline; }
+.container { padding:20px; }
+.dashboard h2 { color:#4a148c; margin-bottom:10px; }
+body.dark .dashboard h2 { color:#c39bd3; }
+table { width:100%; border-collapse:collapse; margin-bottom:20px; }
+table th, table td { padding:10px; border:1px solid #ccc; text-align:left; }
+body.dark table th, body.dark table td { border:1px solid #555; }
+.card { background:#f5f5f5; padding:15px; border-radius:10px; margin-bottom:15px; }
+body.dark .card { background:#1e1e1e; }
+footer { background:#4a148c; color:white; text-align:center; padding:10px; }
+</style>
+</head>
+<body>
+<div id="waveBackground"></div>
+
+<!-- Login/Register Screen -->
+<div id="loginScreen">
+  <div class="form-container">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username"><br>
+    <input type="password" id="password" placeholder="Password">
+    <button id="togglePw" onclick="togglePassword()">👁️</button><br>
+    <select id="role">
+      <option value="">Select Role</option>
+      <option value="superadmin">Super Admin</option>
+      <option value="admin">Admin</option>
+      <option value="user">User</option>
+    </select><br>
+    <button onclick="login()">Login</button>
+  </div>
+  <div class="form-container">
+    <h2>Register</h2>
+    <input type="text" id="reg_username" placeholder="Username"><br>
+    <input type="password" id="reg_password" placeholder="Password"><br>
+    <select id="reg_role">
+      <option value="">Select Role</option>
+      <option value="user">User</option>
+      <option value="admin">Admin</option>
+      <option value="superadmin">Superadmin</option>
+    </select><br>
+    <button onclick="registerUser()">Register</button>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="mainApp">
+  <header>
+    <span>🏫 College Management System</span>
+    <div>
+      <button onclick="toggleDarkMode()">🌙 Dark/Light</button>
+      <button onclick="logout()">Logout</button>
+    </div>
+  </header>
+  <nav id="navbar"></nav>
+  <div class="container" id="dashboard"></div>
+  <footer>© 2025 College Management System</footer>
+</div>
+
+<script>
+// Users, courses, and admin assignments
+let users = [
+  { username: "admin", password: "admin123", role: "admin", courses: [] },
+  { username: "superadmin", password: "superadmin123", role: "superadmin", courses: [] },
+  { username: "user", password: "user123", role: "user", courses: [] }
+];
+let courses = ["Math", "Physics", "Chemistry"];
+let adminCourseAssignments = {}; // { adminUsername: ["Math","Physics"] }
+let currentUserRole = "";
+let currentUsername = "";
+
+function login() {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+  const role = document.getElementById("role").value;
+
+  if (!username || !password || !role) { alert("Fill all fields!"); return; }
+
+  fetch('login.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&role=${encodeURIComponent(role)}`
+  })
+  .then(res => res.json())
+  .then(data => {
+    if(data.status === "success") {
+      currentUsername = username;
+      currentUserRole = role;
+      document.getElementById("loginScreen").style.display = "none";
+      document.getElementById("mainApp").style.display = "block";
+      renderDashboard(role);
+    } else {
+      alert(data.message);
+    }
+  })
+  .catch(err => { console.error(err); alert("Login failed."); });
+}
+
+function registerUser() {
+  const username = document.getElementById("reg_username").value.trim();
+  const password = document.getElementById("reg_password").value.trim();
+  const role = document.getElementById("reg_role").value;
+
+  if(!username || !password || !role){ alert("Fill all fields!"); return; }
+
+  fetch('register.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&role=${encodeURIComponent(role)}`
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert(data.message);
+    if(data.status === "success"){
+      document.getElementById("reg_username").value="";
+      document.getElementById("reg_password").value="";
+      document.getElementById("reg_role").value="";
+    }
+  })
+  .catch(err => { console.error(err); alert("Registration failed."); });
+}
+
+
+
+function registerUser() {
+  const username = document.getElementById("reg_username").value.trim();
+  const password = document.getElementById("reg_password").value.trim();
+  const role = document.getElementById("reg_role").value;
+  if(!username||!password||!role){ alert("Please fill all fields!"); return; }
+  users.push({ username, password, role, courses: [] });
+  alert("User registered successfully!");
+  document.getElementById("reg_username").value="";
+  document.getElementById("reg_password").value="";
+  document.getElementById("reg_role").value="";
+}
+
+function logout() {
+  document.getElementById("mainApp").style.display="none";
+  document.getElementById("loginScreen").style.display="flex";
+  document.getElementById("username").value="";
+  document.getElementById("password").value="";
+  document.getElementById("role").value="";
+}
+
+function toggleDarkMode(){ document.body.classList.toggle("dark"); }
+function togglePassword(){ const pwField=document.getElementById("password"); pwField.type = pwField.type==="password"?"text":"password"; }
+
+function renderDashboard(role){
+  const navbar=document.getElementById("navbar");
+  const dashboard=document.getElementById("dashboard");
+  navbar.innerHTML=""; dashboard.innerHTML="";
+
+  if(role==="superadmin"){
+    navbar.innerHTML=`
+      <a href="#" onclick="showContent('Manage Admins')">Manage Admins</a>
+      <a href="#" onclick="showContent('Assign Courses')">Assign Courses</a>
+    `;
+    dashboard.innerHTML=`
+      <div class="dashboard">
+        <h2>Super Admin Dashboard</h2>
+        <div class="card">
+          <h3>Assign Courses to Admins</h3>
+          <select id="adminSelect"><option value="">Select Admin</option>${users.filter(u=>u.role==="admin").map(a=>`<option value="${a.username}">${a.username}</option>`).join('')}</select><br>
+          <select id="courseSelect"><option value="">Select Course</option>${courses.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><br>
+          <button onclick="assignCourse()">Assign Course</button>
+        </div>
+        <div class="card">
+          <h3>Admin Course Assignments</h3>
+          <ul id="adminAssignmentsList"></ul>
+        </div>
+      </div>
+    `;
+    updateAdminAssignmentsList();
+  } else if(role==="admin"){
+    navbar.innerHTML=`
+      <a href="#" onclick="showContent('View Assigned Courses')">View Assigned Courses</a>
+    `;
+    updateAdminCoursesList();
+  } else if(role==="user"){
+    navbar.innerHTML=`
+      <a href="#" onclick="showContent('Register Courses')">Register Courses</a>
+      <a href="#" onclick="showContent('Profile')">Profile</a>
+    `;
+    showUserCourses();
+  }
+}
+
+// Superadmin assigns course to admin
+function assignCourse(){
+  const admin=document.getElementById("adminSelect").value;
+  const course=document.getElementById("courseSelect").value;
+  if(!admin||!course){ alert("Select admin and course!"); return; }
+  if(!adminCourseAssignments[admin]) adminCourseAssignments[admin]=[];
+  if(!adminCourseAssignments[admin].includes(course)){
+    adminCourseAssignments[admin].push(course);
+    alert(`Course "${course}" assigned to admin "${admin}"`);
+    updateAdminAssignmentsList();
+  } else { alert("Course already assigned to this admin!"); }
+}
+
+function updateAdminAssignmentsList(){
+  const ul=document.getElementById("adminAssignmentsList");
+  ul.innerHTML="";
+  for(const admin in adminCourseAssignments){
+    const coursesList = adminCourseAssignments[admin].join(', ');
+    ul.innerHTML+=`<li>${admin}: ${coursesList}</li>`;
+  }
+}
+
+// Admin views assigned courses dynamically
+function updateAdminCoursesList(){
+  const dashboard=document.getElementById("dashboard");
+  dashboard.innerHTML=`
+    <div class="dashboard">
+      <h2>Admin Dashboard</h2>
+      <div class="card">
+        <h3>Your Assigned Courses</h3>
+        <ul id="adminCoursesList"></ul>
+      </div>
+    </div>
+  `;
+  const ul=document.getElementById("adminCoursesList");
+  const courses=adminCourseAssignments[currentUsername]||[];
+  ul.innerHTML=courses.map(c=>`<li>${c}</li>`).join('');
+}
+
+// User registers for multiple courses
+function registerCourse(){
+  const selectedCourse=document.getElementById("userCourseSelect").value;
+  if(!selectedCourse){ alert("Select a course"); return; }
+  const user = users.find(u=>u.username===currentUsername);
+  if(!user.courses.includes(selectedCourse)){
+    user.courses.push(selectedCourse);
+    alert("Course registered successfully!");
+    showUserCourses();
+  } else { alert("Course already registered!"); }
+}
+
+function showUserCourses(){
+  const dashboard=document.getElementById("dashboard");
+  const user=users.find(u=>u.username===currentUsername);
+  dashboard.innerHTML=`
+    <div class="dashboard">
+      <h2>User Dashboard</h2>
+      <div class="card">
+        <h3>Register Courses</h3>
+        <select id="userCourseSelect"><option value="">Select Course</option>${courses.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><br>
+        <button onclick="registerCourse()">Register Course</button>
+        <h4>Your Registered Courses:</h4>
+        <ul>${user.courses.map(c=>`<li>${c}</li>`).join('')}</ul>
+      </div>
+    </div>
+  `;
+}
+
+function showContent(content){
+  if(currentUserRole==="superadmin" && content==="Assign Courses"){ renderDashboard("superadmin"); }
+  else if(currentUserRole==="user" && content==="Register Courses"){ showUserCourses(); }
+  else if(currentUserRole==="admin" && content==="View Assigned Courses"){ updateAdminCoursesList(); }
+}
+</script>
+</body>
+</html>
+
