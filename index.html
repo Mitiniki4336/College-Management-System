@@ -20,7 +20,6 @@ button { background:#4a148c; color:white; cursor:pointer; border:none; transitio
 button:hover { background:#6a1b9a; }
 #togglePw { position:absolute; right:20px; top:110px; background:transparent; border:none; cursor:pointer; font-size:18px; }
 #mainApp { display:none; opacity:1; transition: opacity 0.5s ease, transform 0.5s ease; }
-#mainApp.logout { opacity:0; transform:translateY(-20px); }
 header { background:#4a148c; color:white; padding:20px; text-align:center; font-size:24px; font-weight:bold; display:flex; justify-content:space-between; align-items:center; }
 header button { background:#fff; color:#4a148c; border:none; padding:8px 15px; border-radius:8px; cursor:pointer; margin-left:10px; }
 header button:hover { background:#eee; }
@@ -87,110 +86,94 @@ footer { background:#4a148c; color:white; text-align:center; padding:10px; }
 </div>
 
 <script>
-// Users, courses, and admin assignments
-let users = [
+// === BASIC VARIABLES ===
+let users = JSON.parse(localStorage.getItem("users")) || [
   { username: "admin", password: "admin123", role: "admin", courses: [] },
   { username: "superadmin", password: "superadmin123", role: "superadmin", courses: [] },
   { username: "user", password: "user123", role: "user", courses: [] }
 ];
 let courses = ["Math", "Physics", "Chemistry"];
-let adminCourseAssignments = {}; // { adminUsername: ["Math","Physics"] }
+let adminCourseAssignments = JSON.parse(localStorage.getItem("adminAssignments")) || {};
 let currentUserRole = "";
 let currentUsername = "";
 
+// === LOGIN FUNCTION ===
 function login() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
   const role = document.getElementById("role").value;
 
-  if (!username || !password || !role) { alert("Fill all fields!"); return; }
+  if (!username || !password || !role) return alert("Fill all fields!");
 
-  fetch('login.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&role=${encodeURIComponent(role)}`
-  })
-  .then(res => res.json())
-  .then(data => {
-    if(data.status === "success") {
-      currentUsername = username;
-      currentUserRole = role;
-      document.getElementById("loginScreen").style.display = "none";
-      document.getElementById("mainApp").style.display = "block";
-      renderDashboard(role);
-    } else {
-      alert(data.message);
-    }
-  })
-  .catch(err => { console.error(err); alert("Login failed."); });
+  const user = users.find(u => u.username === username && u.password === password && u.role === role);
+
+  if (user) {
+    currentUsername = username;
+    currentUserRole = role;
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("mainApp").style.display = "block";
+    renderDashboard(role);
+  } else {
+    alert("Invalid username, password, or role!");
+  }
 }
 
+// === REGISTER FUNCTION ===
 function registerUser() {
   const username = document.getElementById("reg_username").value.trim();
   const password = document.getElementById("reg_password").value.trim();
   const role = document.getElementById("reg_role").value;
 
-  if(!username || !password || !role){ alert("Fill all fields!"); return; }
+  if (!username || !password || !role) return alert("Fill all fields!");
+  if (users.some(u => u.username === username)) return alert("Username already exists!");
 
-  fetch('register.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&role=${encodeURIComponent(role)}`
-  })
-  .then(res => res.json())
-  .then(data => {
-    alert(data.message);
-    if(data.status === "success"){
-      document.getElementById("reg_username").value="";
-      document.getElementById("reg_password").value="";
-      document.getElementById("reg_role").value="";
-    }
-  })
-  .catch(err => { console.error(err); alert("Registration failed."); });
-}
-
-
-
-function registerUser() {
-  const username = document.getElementById("reg_username").value.trim();
-  const password = document.getElementById("reg_password").value.trim();
-  const role = document.getElementById("reg_role").value;
-  if(!username||!password||!role){ alert("Please fill all fields!"); return; }
   users.push({ username, password, role, courses: [] });
+  localStorage.setItem("users", JSON.stringify(users));
+
   alert("User registered successfully!");
-  document.getElementById("reg_username").value="";
-  document.getElementById("reg_password").value="";
-  document.getElementById("reg_role").value="";
+  document.getElementById("reg_username").value = "";
+  document.getElementById("reg_password").value = "";
+  document.getElementById("reg_role").value = "";
 }
 
+// === LOGOUT FUNCTION ===
 function logout() {
-  document.getElementById("mainApp").style.display="none";
-  document.getElementById("loginScreen").style.display="flex";
-  document.getElementById("username").value="";
-  document.getElementById("password").value="";
-  document.getElementById("role").value="";
+  document.getElementById("mainApp").style.display = "none";
+  document.getElementById("loginScreen").style.display = "flex";
+  document.getElementById("username").value = "";
+  document.getElementById("password").value = "";
+  document.getElementById("role").value = "";
 }
 
-function toggleDarkMode(){ document.body.classList.toggle("dark"); }
-function togglePassword(){ const pwField=document.getElementById("password"); pwField.type = pwField.type==="password"?"text":"password"; }
+// === THEME & PASSWORD TOGGLE ===
+function toggleDarkMode() { document.body.classList.toggle("dark"); }
+function togglePassword() {
+  const pwField = document.getElementById("password");
+  pwField.type = pwField.type === "password" ? "text" : "password";
+}
 
-function renderDashboard(role){
-  const navbar=document.getElementById("navbar");
-  const dashboard=document.getElementById("dashboard");
-  navbar.innerHTML=""; dashboard.innerHTML="";
+// === DASHBOARD RENDERING ===
+function renderDashboard(role) {
+  const navbar = document.getElementById("navbar");
+  const dashboard = document.getElementById("dashboard");
+  navbar.innerHTML = "";
+  dashboard.innerHTML = "";
 
-  if(role==="superadmin"){
-    navbar.innerHTML=`
-      <a href="#" onclick="showContent('Manage Admins')">Manage Admins</a>
+  if (role === "superadmin") {
+    navbar.innerHTML = `
       <a href="#" onclick="showContent('Assign Courses')">Assign Courses</a>
     `;
-    dashboard.innerHTML=`
+    dashboard.innerHTML = `
       <div class="dashboard">
         <h2>Super Admin Dashboard</h2>
         <div class="card">
           <h3>Assign Courses to Admins</h3>
-          <select id="adminSelect"><option value="">Select Admin</option>${users.filter(u=>u.role==="admin").map(a=>`<option value="${a.username}">${a.username}</option>`).join('')}</select><br>
-          <select id="courseSelect"><option value="">Select Course</option>${courses.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><br>
+          <select id="adminSelect"><option value="">Select Admin</option>
+            ${users.filter(u => u.role === "admin").map(a => `<option value="${a.username}">${a.username}</option>`).join("")}
+          </select><br>
+          <select id="courseSelect"><option value="">Select Course</option>
+            ${courses.map(c => `<option value="${c}">${c}</option>`).join("")}
+          </select><br>
           <button onclick="assignCourse()">Assign Course</button>
         </div>
         <div class="card">
@@ -200,13 +183,11 @@ function renderDashboard(role){
       </div>
     `;
     updateAdminAssignmentsList();
-  } else if(role==="admin"){
-    navbar.innerHTML=`
-      <a href="#" onclick="showContent('View Assigned Courses')">View Assigned Courses</a>
-    `;
+  } else if (role === "admin") {
+    navbar.innerHTML = `<a href="#" onclick="showContent('View Assigned Courses')">View Assigned Courses</a>`;
     updateAdminCoursesList();
-  } else if(role==="user"){
-    navbar.innerHTML=`
+  } else if (role === "user") {
+    navbar.innerHTML = `
       <a href="#" onclick="showContent('Register Courses')">Register Courses</a>
       <a href="#" onclick="showContent('Profile')">Profile</a>
     `;
@@ -214,80 +195,86 @@ function renderDashboard(role){
   }
 }
 
-// Superadmin assigns course to admin
-function assignCourse(){
-  const admin=document.getElementById("adminSelect").value;
-  const course=document.getElementById("courseSelect").value;
-  if(!admin||!course){ alert("Select admin and course!"); return; }
-  if(!adminCourseAssignments[admin]) adminCourseAssignments[admin]=[];
-  if(!adminCourseAssignments[admin].includes(course)){
+// === SUPERADMIN ASSIGNMENT FUNCTIONS ===
+function assignCourse() {
+  const admin = document.getElementById("adminSelect").value;
+  const course = document.getElementById("courseSelect").value;
+  if (!admin || !course) return alert("Select admin and course!");
+  if (!adminCourseAssignments[admin]) adminCourseAssignments[admin] = [];
+  if (!adminCourseAssignments[admin].includes(course)) {
     adminCourseAssignments[admin].push(course);
-    alert(`Course "${course}" assigned to admin "${admin}"`);
+    localStorage.setItem("adminAssignments", JSON.stringify(adminCourseAssignments));
+    alert(`Assigned ${course} to ${admin}`);
     updateAdminAssignmentsList();
-  } else { alert("Course already assigned to this admin!"); }
-}
-
-function updateAdminAssignmentsList(){
-  const ul=document.getElementById("adminAssignmentsList");
-  ul.innerHTML="";
-  for(const admin in adminCourseAssignments){
-    const coursesList = adminCourseAssignments[admin].join(', ');
-    ul.innerHTML+=`<li>${admin}: ${coursesList}</li>`;
+  } else {
+    alert("Course already assigned to this admin!");
   }
 }
 
-// Admin views assigned courses dynamically
-function updateAdminCoursesList(){
-  const dashboard=document.getElementById("dashboard");
-  dashboard.innerHTML=`
+function updateAdminAssignmentsList() {
+  const ul = document.getElementById("adminAssignmentsList");
+  if (!ul) return;
+  ul.innerHTML = "";
+  for (const admin in adminCourseAssignments) {
+    const coursesList = adminCourseAssignments[admin].join(", ");
+    ul.innerHTML += `<li>${admin}: ${coursesList}</li>`;
+  }
+}
+
+// === ADMIN DASHBOARD ===
+function updateAdminCoursesList() {
+  const dashboard = document.getElementById("dashboard");
+  const coursesList = adminCourseAssignments[currentUsername] || [];
+  dashboard.innerHTML = `
     <div class="dashboard">
       <h2>Admin Dashboard</h2>
       <div class="card">
         <h3>Your Assigned Courses</h3>
-        <ul id="adminCoursesList"></ul>
+        <ul>${coursesList.map(c => `<li>${c}</li>`).join("") || "<li>No courses assigned.</li>"}</ul>
       </div>
     </div>
   `;
-  const ul=document.getElementById("adminCoursesList");
-  const courses=adminCourseAssignments[currentUsername]||[];
-  ul.innerHTML=courses.map(c=>`<li>${c}</li>`).join('');
 }
 
-// User registers for multiple courses
-function registerCourse(){
-  const selectedCourse=document.getElementById("userCourseSelect").value;
-  if(!selectedCourse){ alert("Select a course"); return; }
-  const user = users.find(u=>u.username===currentUsername);
-  if(!user.courses.includes(selectedCourse)){
+// === USER DASHBOARD ===
+function registerCourse() {
+  const selectedCourse = document.getElementById("userCourseSelect").value;
+  if (!selectedCourse) return alert("Select a course!");
+  const user = users.find(u => u.username === currentUsername);
+  if (!user.courses.includes(selectedCourse)) {
     user.courses.push(selectedCourse);
+    localStorage.setItem("users", JSON.stringify(users));
     alert("Course registered successfully!");
     showUserCourses();
-  } else { alert("Course already registered!"); }
+  } else alert("Course already registered!");
 }
 
-function showUserCourses(){
-  const dashboard=document.getElementById("dashboard");
-  const user=users.find(u=>u.username===currentUsername);
-  dashboard.innerHTML=`
+function showUserCourses() {
+  const dashboard = document.getElementById("dashboard");
+  const user = users.find(u => u.username === currentUsername);
+  dashboard.innerHTML = `
     <div class="dashboard">
       <h2>User Dashboard</h2>
       <div class="card">
         <h3>Register Courses</h3>
-        <select id="userCourseSelect"><option value="">Select Course</option>${courses.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><br>
+        <select id="userCourseSelect">
+          <option value="">Select Course</option>
+          ${courses.map(c => `<option value="${c}">${c}</option>`).join("")}
+        </select><br>
         <button onclick="registerCourse()">Register Course</button>
         <h4>Your Registered Courses:</h4>
-        <ul>${user.courses.map(c=>`<li>${c}</li>`).join('')}</ul>
+        <ul>${user.courses.map(c => `<li>${c}</li>`).join("") || "<li>No courses registered yet.</li>"}</ul>
       </div>
     </div>
   `;
 }
 
-function showContent(content){
-  if(currentUserRole==="superadmin" && content==="Assign Courses"){ renderDashboard("superadmin"); }
-  else if(currentUserRole==="user" && content==="Register Courses"){ showUserCourses(); }
-  else if(currentUserRole==="admin" && content==="View Assigned Courses"){ updateAdminCoursesList(); }
+// === CONTENT SWITCHER ===
+function showContent(content) {
+  if (currentUserRole === "superadmin" && content === "Assign Courses") renderDashboard("superadmin");
+  else if (currentUserRole === "user" && content === "Register Courses") showUserCourses();
+  else if (currentUserRole === "admin" && content === "View Assigned Courses") updateAdminCoursesList();
 }
 </script>
 </body>
 </html>
-
